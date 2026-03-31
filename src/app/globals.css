@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  color: #1C1C1C;
+  background: #F7F3EE;
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+@layer components {
+  /* Card styles */
+  .card {
+    @apply bg-white rounded-2xl border border-cream-deep shadow-sm;
+  }
+
+  /* Input base */
+  .input-base {
+    @apply w-full px-4 py-3 rounded-xl border border-cream-deep bg-white text-charcoal
+           focus:outline-none focus:ring-2 focus:ring-terracotta/30 focus:border-terracotta
+           placeholder:text-charcoal-muted transition-colors;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
+           bg-terracotta text-white font-semibold text-sm
+           hover:bg-terracotta-light active:bg-terracotta-dark
+           transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Secondary button */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl
+           bg-white text-charcoal font-semibold text-sm border border-cream-deep
+           hover:bg-cream transition-colors duration-150;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg
+           text-charcoal-soft font-medium text-sm
+           hover:bg-cream transition-colors duration-150;
+  }
+
+  /* Section headings */
+  .section-label {
+    @apply text-xs font-semibold tracking-widest uppercase text-terracotta;
+  }
+
+  /* Listing badge */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+}
