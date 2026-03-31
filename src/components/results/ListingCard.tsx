@@ -1,6 +1,9 @@
 import { ExternalLink, MapPin, Bed, Bath, Zap, Star } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
+import FadeImage from '@/components/ui/FadeImage';
 import type { Listing } from '@/lib/types';
+
+const FALLBACK_PHOTO = 'https://source.unsplash.com/800x500/?mexico-city-apartment-interior';
 
 interface ListingCardProps {
   listing: Listing;
@@ -25,20 +28,15 @@ export default function ListingCard({
 
   return (
     <div className="card overflow-hidden hover:shadow-md transition-all duration-200 group">
-      {/* Image / placeholder */}
-      <div className="relative h-48 bg-gradient-to-br from-cream via-terracotta-pale to-sage-light overflow-hidden">
-        {listing.images?.[0] ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={listing.images[0]}
-            alt={listing.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-5xl opacity-20">🏠</span>
-          </div>
-        )}
+      {/* Image */}
+      <div className="relative h-[200px] w-full overflow-hidden rounded-t-2xl bg-cream-warm">
+        <FadeImage
+          src={listing.images?.[0] ?? FALLBACK_PHOTO}
+          alt={listing.title}
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          className="group-hover:scale-105 transition-transform duration-500"
+        />
 
         {/* Match score badge */}
         <div className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-bold ${matchColor}`}>
