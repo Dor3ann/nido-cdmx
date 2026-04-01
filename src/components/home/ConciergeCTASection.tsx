@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useLocale } from 'next-intl';
 import { Shield, Clock, MessageCircle } from 'lucide-react';
 
-const NIGHT_PHOTO = 'https://images.pexels.com/photos/3225529/pexels-photo-3225529.jpeg?auto=compress&cs=tinysrgb&w=1600';
+const NIGHT_PHOTO = 'https://picsum.photos/seed/nightcity/1600/900';
 
 const perks = [
   { icon: MessageCircle, text: 'We contact landlords in Spanish for you' },

@@ -3,7 +3,7 @@ import Badge from '@/components/ui/Badge';
 import FadeImage from '@/components/ui/FadeImage';
 import type { Listing } from '@/lib/types';
 
-const FALLBACK_PHOTO = 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800';
+const FALLBACK_PHOTO = 'https://picsum.photos/seed/apartment/800/500';
 
 interface ListingCardProps {
   listing: Listing;

@@ -6,7 +6,7 @@ import FadeImage from '@/components/ui/FadeImage';
 import type { SubletListing } from '@/lib/types';
 
 // Apartment interior photo for card images
-const APT_PHOTO = 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=800';
+const APT_PHOTO = 'https://picsum.photos/seed/apartment/800/500';
 
 // Placeholder sublet data — replace with Supabase query
 const PLACEHOLDER_SUBLETS: SubletListing[] = [
