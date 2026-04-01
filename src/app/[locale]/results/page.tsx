@@ -1,27 +1,32 @@
-import { useTranslations, useLocale } from 'next-intl';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useLocale } from 'next-intl';
 import Link from 'next/link';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, Loader2, Home, SlidersHorizontal } from 'lucide-react';
 import ListingCard from '@/components/results/ListingCard';
 import ConciergeUpsellBanner from '@/components/results/ConciergeUpsellBanner';
-import type { Listing } from '@/lib/types';
+import type { Listing } from '@/types/listing';
 
-// ─── Placeholder listings for MVP shell ──────────────────────────────────────
+// ─── Mock listings ─────────────────────────────────────────────────────────────
 
-const PLACEHOLDER_LISTINGS: Listing[] = [
+const MOCK_LISTINGS: Listing[] = [
   {
     id: '1',
-    title: 'Charming 1BR with balcony in Roma Norte',
+    title: 'Charming 1BR with balcony — Álvaro Obregón',
     colonia: 'Roma Norte',
     price: 16500,
     currency: 'MXN',
     bedrooms: 1,
     bathrooms: 1,
     sqMeters: 65,
-    amenities: ['furnished', 'near-metro'],
-    images: [],
+    furnished: true,
+    petsAllowed: false,
+    description:
+      'A well-lit apartment in a sought-after art-deco building on Álvaro Obregón. Walking distance to metro Insurgentes and the best restaurants in Roma. Laundry on-site. No parking included.',
+    images: ['https://picsum.photos/seed/apt-roma/800/500'],
     source: 'Inmuebles24',
     sourceUrl: '#',
-    aiSummary: 'A well-lit apartment in a sought-after building on Álvaro Obregón. Walking distance to metro Insurgentes and the Roma Norte food scene. No parking included.',
     matchScore: 92,
     postedAt: new Date().toISOString(),
   },
@@ -34,11 +39,13 @@ const PLACEHOLDER_LISTINGS: Listing[] = [
     bedrooms: 2,
     bathrooms: 2,
     sqMeters: 95,
-    amenities: ['furnished', 'rooftop', 'parking', 'gym'],
-    images: [],
+    furnished: true,
+    petsAllowed: true,
+    description:
+      'Spacious 2BR in a boutique building with a stunning rooftop. High ceilings, natural light, private parking. Ideal for remote workers or couples. Slightly above market but excellent value for Condesa.',
+    images: ['https://picsum.photos/seed/apt-condesa/800/500'],
     source: 'Lamudi',
     sourceUrl: '#',
-    aiSummary: 'Spacious 2BR in a boutique building with a stunning rooftop. Ideal for remote workers or couples. Slightly above your budget but offers excellent value for Condesa.',
     matchScore: 84,
     postedAt: new Date().toISOString(),
   },
@@ -51,45 +58,51 @@ const PLACEHOLDER_LISTINGS: Listing[] = [
     bedrooms: 0,
     bathrooms: 1,
     sqMeters: 38,
-    amenities: ['near-metro', 'bills-included'],
-    images: [],
+    furnished: false,
+    petsAllowed: false,
+    description:
+      'Compact but efficient studio in the heart of Juárez. Bills included in the rent — great value for the location. The building has 24-hr concierge. Metro Insurgentes is a 3-minute walk.',
+    images: ['https://picsum.photos/seed/apt-juarez/800/500'],
     source: 'Vivanuncios',
     sourceUrl: '#',
-    aiSummary: 'Compact but efficient studio in the heart of Juárez. Bills included — great value. The building is secure with 24-hr concierge. No pets allowed.',
     matchScore: 78,
     postedAt: new Date().toISOString(),
   },
   {
     id: '4',
-    title: 'Bright 1BR loft — Polanco near Presidente Masaryk',
+    title: 'Bright 1BR loft — Polanco, near Presidente Masaryk',
     colonia: 'Polanco',
     price: 21000,
     currency: 'MXN',
     bedrooms: 1,
     bathrooms: 1,
     sqMeters: 72,
-    amenities: ['furnished', 'parking', 'gym'],
-    images: [],
+    furnished: true,
+    petsAllowed: false,
+    description:
+      'Stylish loft in Polanco\'s most sought-after stretch. High ceilings, natural light, and dedicated parking. Gym and doorman in building. A step above typical 1BR pricing but worth it.',
+    images: ['https://picsum.photos/seed/apt-polanco/800/500'],
     source: 'Inmuebles24',
     sourceUrl: '#',
-    aiSummary: 'Stylish loft in Polanco\'s most desirable stretch. High ceilings and natural light. Parking included. A bit above typical 1BR pricing for Polanco.',
     matchScore: 71,
     postedAt: new Date().toISOString(),
   },
   {
     id: '5',
-    title: 'Pet-friendly 2BR with parking — Nápoles',
+    title: 'Pet-friendly 2BR with garden terrace — Nápoles',
     colonia: 'Nápoles',
     price: 18500,
     currency: 'MXN',
     bedrooms: 2,
     bathrooms: 1,
     sqMeters: 80,
-    amenities: ['pet-friendly', 'parking'],
-    images: [],
+    furnished: false,
+    petsAllowed: true,
+    description:
+      'Rare pet-friendly 2BR with a large private terrace in a quiet Nápoles street. Parking included. The building is older but well maintained with a friendly community feel.',
+    images: ['https://picsum.photos/seed/apt-napoles/800/500'],
     source: 'Facebook Marketplace',
     sourceUrl: '#',
-    aiSummary: 'A rare pet-friendly 2BR with a large terrace in a quiet Nápoles street. Central location. The building is older but well maintained.',
     matchScore: 66,
     postedAt: new Date().toISOString(),
   },
@@ -102,73 +115,155 @@ const PLACEHOLDER_LISTINGS: Listing[] = [
     bedrooms: 0,
     bathrooms: 1,
     sqMeters: 42,
-    amenities: ['furnished', 'near-metro'],
-    images: [],
+    furnished: true,
+    petsAllowed: true,
+    description:
+      'Beautifully furnished studio one block from Parque México. Listed exclusively on Nidō Sublets by a departing tenant. Available immediately. Cat and small dog-friendly building.',
+    images: ['https://picsum.photos/seed/apt-sublet/800/500'],
     source: 'Nidō Sublets',
     sourceUrl: '#',
-    aiSummary: 'A beautifully furnished studio one block from Parque México. Listed exclusively on Nidō Sublets by a departing tenant. Available immediately.',
     matchScore: 89,
     postedAt: new Date().toISOString(),
   },
 ];
 
-interface ResultsPageProps {
-  searchParams: {
-    rentalType?: string;
-    budget?: string;
-    currency?: string;
-    area?: string;
-    bedrooms?: string;
-  };
-}
+// ─── Platforms ─────────────────────────────────────────────────────────────────
 
-export default function ResultsPage({ searchParams }: ResultsPageProps) {
-  const t = useTranslations('results');
+const PLATFORMS = ['Inmuebles24', 'Lamudi', 'Vivanuncios', 'Facebook', 'Nidō'];
+
+// ─── Component ─────────────────────────────────────────────────────────────────
+
+export default function ResultsPage() {
   const locale = useLocale();
+  const [loading, setLoading] = useState(true);
+  const [searchLabel, setSearchLabel] = useState('CDMX');
 
-  const listings = PLACEHOLDER_LISTINGS;
-  const area = searchParams.area || 'CDMX';
+  useEffect(() => {
+    const raw = sessionStorage.getItem('nido_search');
+    if (raw) {
+      try {
+        const data = JSON.parse(raw) as Record<string, unknown>;
+        const hoods = data.neighborhoods as string[] | undefined;
+        if (hoods && hoods.length > 0) {
+          setSearchLabel(hoods.join(', '));
+        }
+      } catch {
+        // ignore malformed data
+      }
+    }
+    const timer = setTimeout(() => setLoading(false), 1800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // ── Loading state ────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center gap-5 px-4">
+        <div className="w-16 h-16 rounded-2xl bg-terracotta-pale flex items-center justify-center">
+          <Loader2 className="w-8 h-8 text-terracotta animate-spin" />
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-bold text-charcoal mb-1">Searching across 5 platforms…</p>
+          <p className="text-sm text-charcoal-muted">This usually takes about 30 seconds</p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          {PLATFORMS.map((p, i) => (
+            <div
+              key={p}
+              className="h-1.5 w-10 rounded-full bg-terracotta/20 overflow-hidden"
+            >
+              <div
+                className="h-full bg-terracotta rounded-full animate-pulse"
+                style={{ animationDelay: `${i * 0.25}s` }}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap justify-center gap-2 mt-1">
+          {PLATFORMS.map((p) => (
+            <span key={p} className="text-xs text-charcoal-muted bg-white px-3 py-1 rounded-full border border-cream-deep">
+              {p}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const listings = MOCK_LISTINGS;
+
+  // ── Empty state ──────────────────────────────────────────────────────────────
+
+  if (listings.length === 0) {
+    return (
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center gap-4 px-4">
+        <div className="w-20 h-20 rounded-3xl bg-cream-warm flex items-center justify-center">
+          <Home className="w-9 h-9 text-charcoal-muted" />
+        </div>
+        <div className="text-center max-w-sm">
+          <h2
+            className="text-xl font-bold text-charcoal mb-2"
+            style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif' }}
+          >
+            No listings found
+          </h2>
+          <p className="text-charcoal-muted text-sm mb-6">
+            We couldn&apos;t find any listings matching your criteria. Try broadening your budget,
+            adding more neighborhoods, or adjusting your bedroom count.
+          </p>
+          <Link href={`/${locale}/search`} className="btn-primary gap-2">
+            <Search className="w-4 h-4" />
+            Adjust Search
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Results ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="bg-cream min-h-screen">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
           <div>
+            <p className="section-label mb-1">Search results</p>
             <h1
               className="text-3xl font-bold text-charcoal"
               style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif' }}
             >
-              {t('title')}
+              {listings.length} listings found
             </h1>
             <p className="text-charcoal-muted mt-1 text-sm">
-              {t('subtitle', { count: listings.length })}
-              {area && <span className="font-medium text-terracotta"> · {area}</span>}
+              Searching in{' '}
+              <span className="font-medium text-terracotta">{searchLabel}</span>
+              {' · '}Ranked by match score
             </p>
           </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/${locale}/search`}
-              className="btn-secondary gap-2 text-sm py-2.5"
-            >
-              <Search className="w-3.5 h-3.5" />
-              {t('newSearch')}
-            </Link>
-          </div>
+          <Link
+            href={`/${locale}/search`}
+            className="btn-secondary gap-2 text-sm py-2.5 self-start"
+          >
+            <Search className="w-3.5 h-3.5" />
+            New Search
+          </Link>
         </div>
 
-        {/* Sort/filter bar */}
+        {/* Sort bar */}
         <div className="flex items-center justify-between mb-6 pb-4 border-b border-cream-deep">
           <div className="flex items-center gap-2 text-sm text-charcoal-muted">
             <SlidersHorizontal className="w-4 h-4" />
-            <span className="font-medium">{t('sortBy')}:</span>
-            {[t('sortMatch'), t('sortPrice'), t('sortDate')].map((sort, i) => (
+            <span className="font-medium">Sort by:</span>
+            {['Best match', 'Lowest price', 'Newest'].map((sort, i) => (
               <button
                 key={sort}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
-                  i === 0 ? 'bg-terracotta text-white' : 'hover:bg-cream-warm text-charcoal-muted'
+                  i === 0
+                    ? 'bg-terracotta text-white'
+                    : 'hover:bg-cream-warm text-charcoal-muted'
                 }`}
               >
                 {sort}
@@ -180,16 +275,14 @@ export default function ResultsPage({ searchParams }: ResultsPageProps) {
           </span>
         </div>
 
-        {/* Results grid */}
+        {/* Listings grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
           {listings.map((listing) => (
             <ListingCard
               key={listing.id}
               listing={listing}
-              locale={locale as 'en' | 'es'}
-              perMonthLabel={t('perMonth')}
-              aiSummaryLabel={t('aiSummary')}
-              viewLabel={t('viewListing')}
+              perMonthLabel="/mo"
+              viewLabel="View Listing"
             />
           ))}
         </div>
