@@ -137,22 +137,45 @@ export default function ResultsPage() {
   const locale = useLocale();
   const [loading, setLoading] = useState(true);
   const [searchLabel, setSearchLabel] = useState('CDMX');
+  const [listings, setListings] = useState<Listing[]>([]);
 
   useEffect(() => {
-    const raw = sessionStorage.getItem('nido_search');
-    if (raw) {
+    async function fetchListings() {
+      let criteria: Record<string, unknown> = {};
+
+      const raw = sessionStorage.getItem('nido_search');
+      if (raw) {
+        try {
+          criteria = JSON.parse(raw) as Record<string, unknown>;
+          const hoods = criteria.neighborhoods as string[] | undefined;
+          if (hoods && hoods.length > 0) {
+            setSearchLabel(hoods.join(', '));
+          }
+        } catch {
+          // ignore malformed data
+        }
+      }
+
       try {
-        const data = JSON.parse(raw) as Record<string, unknown>;
-        const hoods = data.neighborhoods as string[] | undefined;
-        if (hoods && hoods.length > 0) {
-          setSearchLabel(hoods.join(', '));
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(criteria),
+        });
+        const data = await res.json() as { listings?: Listing[] };
+        if (Array.isArray(data.listings) && data.listings.length > 0) {
+          setListings(data.listings);
+        } else {
+          setListings(MOCK_LISTINGS);
         }
       } catch {
-        // ignore malformed data
+        setListings(MOCK_LISTINGS);
+      } finally {
+        setLoading(false);
       }
     }
-    const timer = setTimeout(() => setLoading(false), 1800);
-    return () => clearTimeout(timer);
+
+    fetchListings();
   }, []);
 
   // ── Loading state ────────────────────────────────────────────────────────────
@@ -190,8 +213,6 @@ export default function ResultsPage() {
       </div>
     );
   }
-
-  const listings = MOCK_LISTINGS;
 
   // ── Empty state ──────────────────────────────────────────────────────────────
 
