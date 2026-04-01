@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Listing } from '@/types/listing';
 
+// Allow up to 60 seconds for the web search to complete (Vercel limit)
+export const maxDuration = 60;
+
 // Curated apartment interior photos from Unsplash (free to use)
 const APARTMENT_PHOTOS = [
   'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&w=800&h=500&fit=crop',
@@ -17,10 +20,16 @@ const APARTMENT_PHOTOS = [
 ];
 
 const SYSTEM_PROMPT =
-  'You are a housing search agent for Mexico City. Generate realistic 2026 rental listings matching the criteria. Return ONLY a valid JSON array, no extra text or markdown.';
+  'You are a real estate search agent for Mexico City (CDMX). ' +
+  'Use your web search tool to find REAL, currently listed rental apartments on ' +
+  'Inmuebles24 (inmuebles24.com), Lamudi (lamudi.com.mx), and Vivanuncios (vivanuncios.com.mx). ' +
+  'Search in Spanish — use terms like "departamento en renta [colonia]", "estudio en renta [colonia]". ' +
+  'CRITICAL: After searching, your ENTIRE final response must be ONLY a raw JSON array. ' +
+  'Do NOT write any introductory text, explanations, or prose before or after the array. ' +
+  'Do NOT wrap in markdown code fences. Start your response with [ and end with ].';
 
 function buildUserMessage(criteria: Record<string, unknown>): string {
-  const lines = ['Search criteria:'];
+  const lines = ['Search for REAL rental listings matching these criteria:'];
 
   if (criteria.rentalType) lines.push(`- Rental type: ${criteria.rentalType}`);
 
@@ -35,31 +44,36 @@ function buildUserMessage(criteria: Record<string, unknown>): string {
   if (hoods && hoods.length > 0) {
     lines.push(`- Neighborhoods: ${hoods.join(', ')}`);
   } else {
-    lines.push('- Neighborhoods: any area in CDMX');
+    lines.push('- Neighborhoods: anywhere in CDMX');
   }
 
   if (criteria.bedrooms) lines.push(`- Bedrooms: ${criteria.bedrooms}`);
   if (criteria.furnished && criteria.furnished !== 'either') lines.push(`- Furnished: ${criteria.furnished}`);
-  if (criteria.pets && criteria.pets !== 'either') lines.push(`- Pets allowed: ${criteria.pets}`);
-  if (criteria.moveIn) lines.push(`- Move-in date: ${criteria.moveIn}`);
-  if (criteria.notes) lines.push(`- Additional notes: ${criteria.notes}`);
+  if (criteria.pets && criteria.pets !== 'either') lines.push(`- Pets: ${criteria.pets}`);
+  if (criteria.moveIn) lines.push(`- Move-in: ${criteria.moveIn}`);
+  if (criteria.notes) lines.push(`- Notes: ${criteria.notes}`);
+
+  const language = criteria.locale === 'es' ? 'Spanish' : 'English';
 
   lines.push('');
-  lines.push('Return exactly 8 listings as a JSON array. Each object must have these exact fields:');
   lines.push(
-    'id (unique string), title (string), colonia (string), price (number), currency ("MXN" or "USD"), ' +
-    'bedrooms (number where 0 = studio, or the string "studio"), bathrooms (number), sqMeters (number), ' +
-    'furnished (boolean), petsAllowed (boolean), description (string, 2-3 sentences), ' +
-    'images (empty array []), ' +
-    'source (one of: "Inmuebles24", "Lamudi", "Vivanuncios", "Facebook Marketplace", "Nidō Sublets"), ' +
-    'sourceUrl (string "#"), matchScore (integer 0-100, higher = better match for the criteria), ' +
-    'postedAt (ISO 8601 date string).'
-  );
-  const language = criteria.locale === 'es' ? 'Spanish' : 'English';
-  lines.push(
-    `Vary the sources and colonias. If neighborhoods were specified, most listings should be in those areas. ` +
-    `Mix furnished/unfurnished realistically. Set matchScore based on how closely each listing fits the criteria. ` +
+    'Search Inmuebles24, Lamudi, and Vivanuncios. ' +
+    'Return up to 8 real listings as a JSON array. ' +
+    'If you find fewer than 8 real ones, fill remaining spots with the closest matches. ' +
     `Write all titles and descriptions in ${language}.`
+  );
+  lines.push('');
+  lines.push('Each object must have these exact fields:');
+  lines.push(
+    'id (unique string), title (string), colonia (string), price (number), ' +
+    'currency ("MXN" or "USD"), bedrooms (number, 0 = studio), bathrooms (number), ' +
+    'sqMeters (number — estimate if not listed), furnished (boolean — infer from listing), ' +
+    'petsAllowed (boolean — infer from listing), description (2-3 sentence summary), ' +
+    'images ([]), ' +
+    'source ("Inmuebles24" | "Lamudi" | "Vivanuncios" | "Facebook Marketplace" | "Nidō Sublets"), ' +
+    'sourceUrl (the actual listing URL — this is critical, use the real URL), ' +
+    'matchScore (0-100 based on how well it matches the criteria), ' +
+    'postedAt (ISO date string, today).'
   );
 
   return lines.join('\n');
@@ -76,30 +90,103 @@ export async function POST(request: Request) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.warn('[/api/search] ANTHROPIC_API_KEY not set — returning empty listings');
-    return NextResponse.json({ listings: [] }, { status: 200 });
+    console.warn('[/api/search] ANTHROPIC_API_KEY not set');
+    return NextResponse.json({ listings: [] });
   }
 
   try {
     const client = new Anthropic({ apiKey });
 
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildUserMessage(criteria) }],
-    });
+    const messages: Anthropic.MessageParam[] = [
+      { role: 'user', content: buildUserMessage(criteria) },
+    ];
 
-    const rawText = (message.content[0] as { type: string; text: string }).text.trim();
-    // Strip markdown code fences if Claude wraps the response despite instructions
-    const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-    const listings: Listing[] = JSON.parse(jsonText);
+    let rawText = '';
 
-    if (!Array.isArray(listings)) {
-      throw new Error('Claude returned non-array response');
+    // Agentic loop — Claude may search multiple times before returning the JSON
+    for (let i = 0; i < 8; i++) {
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8096,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' } as never],
+        system: SYSTEM_PROMPT,
+        messages,
+      });
+
+      if (response.stop_reason === 'end_turn') {
+        rawText = response.content
+          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('');
+        break;
+      }
+
+      if (response.stop_reason === 'tool_use') {
+        // Add Claude's turn (which includes tool_use blocks) to the conversation
+        messages.push({ role: 'assistant', content: response.content });
+
+        // For Anthropic's server-side web_search tool, we don't execute the search —
+        // Anthropic handles it. We just acknowledge each tool_use block and continue.
+        const toolUses = response.content.filter(
+          (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+        );
+
+        if (toolUses.length > 0) {
+          messages.push({
+            role: 'user',
+            content: toolUses.map((b) => ({
+              type: 'tool_result' as const,
+              tool_use_id: b.id,
+              content: 'Search executed.',
+            })),
+          });
+        }
+      } else {
+        break;
+      }
     }
 
-    // Assign apartment photos from the curated pool (one per listing, cycling)
+    if (!rawText) {
+      throw new Error('No text response from Claude after search');
+    }
+
+    // If the response is prose (not JSON), do one more turn to force JSON output
+    const trimmed = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) {
+      messages.push({ role: 'assistant', content: rawText });
+      messages.push({
+        role: 'user',
+        content:
+          'Output ONLY the JSON array of listings now. No prose, no markdown, no explanation. ' +
+          'Start with [ and end with ]. Nothing else.',
+      });
+      const forceResponse = await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8096,
+        system: SYSTEM_PROMPT,
+        messages,
+      });
+      rawText = forceResponse.content
+        .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+        .map((b) => b.text)
+        .join('');
+    }
+
+    // Try to extract a JSON array — Claude sometimes wraps it in prose or code fences
+    let jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+    if (!jsonText.startsWith('[')) {
+      const match = jsonText.match(/\[[\s\S]*\]/);
+      if (match) {
+        jsonText = match[0];
+      }
+    }
+    const listings = JSON.parse(jsonText) as Listing[];
+
+    if (!Array.isArray(listings)) {
+      throw new Error('Expected JSON array');
+    }
+
+    // Assign apartment photos (one per listing, cycling through pool)
     const withPhotos = listings.map((listing, i) => ({
       ...listing,
       images: [APARTMENT_PHOTOS[i % APARTMENT_PHOTOS.length]],
@@ -107,7 +194,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ listings: withPhotos });
   } catch (error) {
-    console.error('[/api/search] Claude error:', error);
-    return NextResponse.json({ listings: [] }, { status: 200 });
+    console.error('[/api/search] Error:', error);
+    return NextResponse.json({ listings: [] });
   }
 }
