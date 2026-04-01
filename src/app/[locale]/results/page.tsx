@@ -160,7 +160,7 @@ export default function ResultsPage() {
         const res = await fetch('/api/search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(criteria),
+          body: JSON.stringify({ ...criteria, locale }),
         });
         const data = await res.json() as { listings?: Listing[] };
         if (Array.isArray(data.listings) && data.listings.length > 0) {

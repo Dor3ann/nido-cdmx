@@ -41,9 +41,11 @@ function buildUserMessage(criteria: Record<string, unknown>): string {
     'sourceUrl (string "#"), matchScore (integer 0-100, higher = better match for the criteria), ' +
     'postedAt (ISO 8601 date string).'
   );
+  const language = criteria.locale === 'es' ? 'Spanish' : 'English';
   lines.push(
-    'Vary the sources and colonias. If neighborhoods were specified, most listings should be in those areas. ' +
-    'Mix furnished/unfurnished realistically. Set matchScore based on how closely each listing fits the criteria.'
+    `Vary the sources and colonias. If neighborhoods were specified, most listings should be in those areas. ` +
+    `Mix furnished/unfurnished realistically. Set matchScore based on how closely each listing fits the criteria. ` +
+    `Write all titles and descriptions in ${language}.`
   );
 
   return lines.join('\n');
