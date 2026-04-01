@@ -2,6 +2,20 @@ import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Listing } from '@/types/listing';
 
+// Curated apartment interior photos from Unsplash (free to use)
+const APARTMENT_PHOTOS = [
+  'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&w=800&h=500&fit=crop',
+  'https://images.unsplash.com/photo-1565538810643-b5bdb714032a?auto=format&w=800&h=500&fit=crop',
+];
+
 const SYSTEM_PROMPT =
   'You are a housing search agent for Mexico City. Generate realistic 2026 rental listings matching the criteria. Return ONLY a valid JSON array, no extra text or markdown.';
 
@@ -85,7 +99,13 @@ export async function POST(request: Request) {
       throw new Error('Claude returned non-array response');
     }
 
-    return NextResponse.json({ listings });
+    // Assign apartment photos from the curated pool (one per listing, cycling)
+    const withPhotos = listings.map((listing, i) => ({
+      ...listing,
+      images: [APARTMENT_PHOTOS[i % APARTMENT_PHOTOS.length]],
+    }));
+
+    return NextResponse.json({ listings: withPhotos });
   } catch (error) {
     console.error('[/api/search] Claude error:', error);
     return NextResponse.json({ listings: [] }, { status: 200 });
