@@ -75,7 +75,9 @@ export async function POST(request: Request) {
     });
 
     const rawText = (message.content[0] as { type: string; text: string }).text.trim();
-    const listings: Listing[] = JSON.parse(rawText);
+    // Strip markdown code fences if Claude wraps the response despite instructions
+    const jsonText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    const listings: Listing[] = JSON.parse(jsonText);
 
     if (!Array.isArray(listings)) {
       throw new Error('Claude returned non-array response');
