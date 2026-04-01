@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { useTranslations, useLocale } from 'next-intl';
 import { ArrowRight, Search, Star } from 'lucide-react';
 
-const HERO_IMAGE = 'https://source.unsplash.com/1600x900/?mexico-city-apartment-rooftop';
+const HERO_IMAGE = 'https://images.pexels.com/photos/2190283/pexels-photo-2190283.jpeg?auto=compress&cs=tinysrgb&w=1600';
 
 export default function HeroSection() {
   const t = useTranslations('hero');
