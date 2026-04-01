@@ -3,38 +3,38 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { ArrowRight, ArrowLeft, Loader2, MapPin } from 'lucide-react';
-import type { Amenity, Bedrooms, Currency, RentalType, SearchParams } from '@/lib/types';
-import Input from '@/components/ui/Input';
-import Checkbox from '@/components/ui/Checkbox';
+import { ArrowRight, ArrowLeft, Home } from 'lucide-react';
+import type { Bedrooms, Currency, RentalType } from '@/lib/types';
 import Button from '@/components/ui/Button';
 
-// ─── Form steps ────────────────────────────────────────────────────────────
+// ─── Constants ─────────────────────────────────────────────────────────────
 
 const TOTAL_STEPS = 4;
-
-const AMENITY_CONFIG: { key: Amenity; icon: string }[] = [
-  { key: 'furnished', icon: '🛋️' },
-  { key: 'pet-friendly', icon: '🐾' },
-  { key: 'parking', icon: '🚗' },
-  { key: 'gym', icon: '💪' },
-  { key: 'rooftop', icon: '🏙️' },
-  { key: 'bills-included', icon: '⚡' },
-  { key: 'near-metro', icon: '🚇' },
-];
-
-const BEDROOMS: { value: Bedrooms; labelKey: 'studio' | 'oneBed' | 'twoBed' | 'threePlus' }[] = [
-  { value: 'studio', labelKey: 'studio' },
-  { value: '1', labelKey: 'oneBed' },
-  { value: '2', labelKey: 'twoBed' },
-  { value: '3+', labelKey: 'threePlus' },
-];
 
 const RENTAL_TYPES: { value: RentalType; labelKey: 'shortTerm' | 'longTerm' | 'sublet'; emoji: string }[] = [
   { value: 'short-term', labelKey: 'shortTerm', emoji: '📅' },
   { value: 'long-term', labelKey: 'longTerm', emoji: '🏠' },
   { value: 'sublet', labelKey: 'sublet', emoji: '🔄' },
 ];
+
+const NEIGHBORHOODS = [
+  'Polanco',
+  'Condesa',
+  'Roma Norte',
+  'Juárez',
+  'Del Valle',
+  'Escandón',
+  'Nápoles',
+] as const;
+
+const BEDROOMS: { value: Bedrooms; label: string }[] = [
+  { value: 'studio', label: 'Studio' },
+  { value: '1',      label: '1 bed'  },
+  { value: '2',      label: '2 beds' },
+  { value: '3+',     label: '3+'     },
+];
+
+type TriOption = 'yes' | 'no' | 'either';
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
@@ -46,59 +46,69 @@ export default function IntakeForm() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
-  // Form state
+  // Step 1
   const [rentalType, setRentalType] = useState<RentalType>('long-term');
-  const [budget, setBudget] = useState('');
-  const [currency, setCurrency] = useState<Currency>('MXN');
-  const [area, setArea] = useState('');
-  const [suggestArea, setSuggestArea] = useState(false);
-  const [bedrooms, setBedrooms] = useState<Bedrooms>('1');
-  const [amenities, setAmenities] = useState<Amenity[]>([]);
-  const [moveIn, setMoveIn] = useState('');
-  const [moveOut, setMoveOut] = useState('');
 
-  const needsDates = rentalType === 'short-term' || rentalType === 'sublet';
+  // Step 2
+  const [budgetMin, setBudgetMin]         = useState('');
+  const [budgetMax, setBudgetMax]         = useState('');
+  const [currency, setCurrency]           = useState<Currency>('MXN');
+  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
 
-  function toggleAmenity(key: Amenity) {
-    setAmenities((prev) =>
-      prev.includes(key) ? prev.filter((a) => a !== key) : [...prev, key]
+  // Step 3
+  const [bedrooms,  setBedrooms]  = useState<Bedrooms>('1');
+  const [furnished, setFurnished] = useState<TriOption>('either');
+  const [pets,      setPets]      = useState<TriOption>('either');
+  const [moveIn,    setMoveIn]    = useState('');
+
+  // Step 4
+  const [notes, setNotes] = useState('');
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  function toggleNeighborhood(name: string) {
+    setNeighborhoods((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
     );
   }
 
-  async function handleSubmit() {
+  function triButton(value: TriOption, current: TriOption, set: (v: TriOption) => void, label: string) {
+    return (
+      <button
+        key={value}
+        type="button"
+        onClick={() => set(value)}
+        className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+          current === value
+            ? 'border-terracotta bg-terracotta-pale text-terracotta'
+            : 'border-cream-deep bg-white text-charcoal hover:border-terracotta/40'
+        }`}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  // ─── Submit ───────────────────────────────────────────────────────────────
+
+  function handleSubmit() {
     setLoading(true);
-    const params: SearchParams = {
-      locale: locale as 'en' | 'es',
+    const data = {
       rentalType,
-      budget: Number(budget),
-      currency,
-      area: suggestArea ? '' : area,
-      suggestArea,
-      bedrooms,
-      amenities,
-      moveInDate: moveIn,
-      moveOutDate: needsDates ? moveOut : undefined,
+      budgetMin, budgetMax, currency,
+      neighborhoods,
+      bedrooms, furnished, pets, moveIn,
+      notes,
     };
-
-    // Encode params as URL query string
-    const query = new URLSearchParams({
-      rentalType: params.rentalType,
-      budget: String(params.budget),
-      currency: params.currency,
-      area: params.area,
-      bedrooms: params.bedrooms,
-      amenities: params.amenities.join(','),
-      moveIn: params.moveInDate,
-      ...(params.moveOutDate ? { moveOut: params.moveOutDate } : {}),
-    });
-
-    router.push(`/${locale}/results?${query.toString()}`);
+    sessionStorage.setItem('nido_search', JSON.stringify(data));
+    router.push(`/${locale}/results`);
   }
 
   // ─── Step content ─────────────────────────────────────────────────────────
 
   const stepContent = [
-    // Step 1 — Rental type
+
+    // ── Step 1 — Rental type (unchanged) ────────────────────────────────────
     <div key="step1" className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-charcoal mb-1" style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif' }}>
@@ -127,7 +137,7 @@ export default function IntakeForm() {
       </div>
     </div>,
 
-    // Step 2 — Budget & area
+    // ── Step 2 — Budget & neighborhoods ─────────────────────────────────────
     <div key="step2" className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-charcoal mb-1" style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif' }}>
@@ -136,25 +146,35 @@ export default function IntakeForm() {
         <p className="text-charcoal-muted text-sm">{t('step', { current: 2, total: TOTAL_STEPS })}</p>
       </div>
 
-      {/* Budget */}
+      {/* Budget min / max */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-charcoal">{t('budget')}</label>
-        <div className="flex gap-2">
+        <label className="block text-sm font-medium text-charcoal">Monthly budget</label>
+        <div className="flex items-center gap-2">
           <input
             type="number"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            placeholder={t('budgetPlaceholder')}
+            value={budgetMin}
+            onChange={(e) => setBudgetMin(e.target.value)}
+            placeholder="Min"
             className="input-base flex-1"
             min={0}
           />
-          <div className="flex rounded-xl border border-cream-deep overflow-hidden">
+          <span className="text-charcoal-muted text-sm font-medium shrink-0">to</span>
+          <input
+            type="number"
+            value={budgetMax}
+            onChange={(e) => setBudgetMax(e.target.value)}
+            placeholder="Max"
+            className="input-base flex-1"
+            min={0}
+          />
+          {/* Currency toggle */}
+          <div className="flex rounded-xl border border-cream-deep overflow-hidden shrink-0">
             {(['MXN', 'USD'] as Currency[]).map((cur) => (
               <button
                 key={cur}
                 type="button"
                 onClick={() => setCurrency(cur)}
-                className={`px-4 py-3 text-sm font-semibold transition-colors ${
+                className={`px-3 py-3 text-sm font-semibold transition-colors ${
                   currency === cur
                     ? 'bg-terracotta text-white'
                     : 'bg-white text-charcoal-soft hover:bg-cream'
@@ -167,139 +187,133 @@ export default function IntakeForm() {
         </div>
       </div>
 
-      {/* Area */}
+      {/* Neighborhood multi-select */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-charcoal">{t('area')}</label>
-        <div className="relative">
-          <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-muted" />
-          <input
-            type="text"
-            value={area}
-            onChange={(e) => { setArea(e.target.value); setSuggestArea(false); }}
-            placeholder={t('areaPlaceholder')}
-            disabled={suggestArea}
-            className={`input-base pl-10 ${suggestArea ? 'opacity-50' : ''}`}
-          />
+        <label className="block text-sm font-medium text-charcoal">
+          Neighborhoods
+          <span className="ml-2 text-xs text-charcoal-muted font-normal">select all that interest you</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {NEIGHBORHOODS.map((name) => {
+            const selected = neighborhoods.includes(name);
+            return (
+              <button
+                key={name}
+                type="button"
+                onClick={() => toggleNeighborhood(name)}
+                className={`px-4 py-2 rounded-xl border-2 text-sm font-medium transition-all ${
+                  selected
+                    ? 'border-terracotta bg-terracotta-pale text-terracotta'
+                    : 'border-cream-deep bg-white text-charcoal hover:border-terracotta/40'
+                }`}
+              >
+                {selected && <span className="mr-1.5">✓</span>}
+                {name}
+              </button>
+            );
+          })}
         </div>
-        <button
-          type="button"
-          onClick={() => { setSuggestArea(!suggestArea); if (!suggestArea) setArea(''); }}
-          className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-            suggestArea ? 'text-terracotta' : 'text-charcoal-muted hover:text-charcoal'
-          }`}
-        >
-          <span className={`w-4 h-4 rounded border-2 flex items-center justify-center ${suggestArea ? 'border-terracotta bg-terracotta' : 'border-cream-deep'}`}>
-            {suggestArea && (
-              <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            )}
-          </span>
-          {t('areaHelp')}
-        </button>
+        {neighborhoods.length === 0 && (
+          <p className="text-xs text-charcoal-muted">No preference selected — we&apos;ll search all areas.</p>
+        )}
       </div>
     </div>,
 
-    // Step 3 — Bedrooms & amenities
+    // ── Step 3 — Bedrooms, furnished, pets, move-in ──────────────────────────
     <div key="step3" className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-charcoal mb-1" style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif' }}>
-          Bedrooms & Features
+          Your preferences
         </h2>
         <p className="text-charcoal-muted text-sm">{t('step', { current: 3, total: TOTAL_STEPS })}</p>
       </div>
 
       {/* Bedrooms */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-charcoal">{t('bedrooms')}</label>
-        <div className="flex gap-2 flex-wrap">
+        <label className="block text-sm font-medium text-charcoal">Bedrooms</label>
+        <div className="flex gap-2">
           {BEDROOMS.map((b) => (
             <button
               key={b.value}
               type="button"
               onClick={() => setBedrooms(b.value)}
-              className={`px-5 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
                 bedrooms === b.value
                   ? 'border-terracotta bg-terracotta-pale text-terracotta'
                   : 'border-cream-deep bg-white text-charcoal hover:border-terracotta/40'
               }`}
             >
-              {t(b.labelKey)}
+              {b.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Amenities */}
+      {/* Furnished */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-charcoal">{t('mustHaves')}</label>
-        <div className="flex flex-wrap gap-2">
-          {AMENITY_CONFIG.map((a) => (
-            <Checkbox
-              key={a.key}
-              label={t(a.key === 'pet-friendly' ? 'petFriendly' :
-                        a.key === 'bills-included' ? 'billsIncluded' :
-                        a.key === 'near-metro' ? 'nearMetro' :
-                        a.key as 'furnished' | 'parking' | 'gym' | 'rooftop')}
-              checked={amenities.includes(a.key)}
-              onChange={() => toggleAmenity(a.key)}
-              icon={a.icon}
-            />
-          ))}
+        <label className="block text-sm font-medium text-charcoal">Furnished?</label>
+        <div className="flex gap-2">
+          {triButton('yes',    furnished, setFurnished, 'Yes')}
+          {triButton('no',     furnished, setFurnished, 'No')}
+          {triButton('either', furnished, setFurnished, 'Either')}
         </div>
+      </div>
+
+      {/* Pets */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-charcoal">Pets allowed?</label>
+        <div className="flex gap-2">
+          {triButton('yes',    pets, setPets, 'Yes')}
+          {triButton('no',     pets, setPets, 'No')}
+          {triButton('either', pets, setPets, 'Either')}
+        </div>
+      </div>
+
+      {/* Move-in date */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-charcoal">Move-in date</label>
+        <input
+          type="date"
+          value={moveIn}
+          onChange={(e) => setMoveIn(e.target.value)}
+          min={new Date().toISOString().split('T')[0]}
+          className="input-base"
+        />
       </div>
     </div>,
 
-    // Step 4 — Dates
+    // ── Step 4 — Notes + submit ──────────────────────────────────────────────
     <div key="step4" className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-charcoal mb-1" style={{ fontFamily: 'var(--font-plus-jakarta), sans-serif' }}>
-          Dates
+          Anything else?
         </h2>
         <p className="text-charcoal-muted text-sm">{t('step', { current: 4, total: TOTAL_STEPS })}</p>
       </div>
 
-      <Input
-        label={t('moveIn')}
-        type="date"
-        value={moveIn}
-        onChange={(e) => setMoveIn(e.target.value)}
-        min={new Date().toISOString().split('T')[0]}
-      />
-
-      {needsDates && (
-        <Input
-          label={t('moveOut')}
-          type="date"
-          value={moveOut}
-          onChange={(e) => setMoveOut(e.target.value)}
-          min={moveIn || new Date().toISOString().split('T')[0]}
-          hint={t('leaseLength')}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium text-charcoal">
+          Additional notes
+          <span className="ml-2 text-xs text-charcoal-muted font-normal">optional</span>
+        </label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="E.g. I need a home office, prefer a quiet street, ground floor is fine, open to new buildings…"
+          rows={5}
+          className="input-base resize-none"
         />
-      )}
-
-      {/* Summary */}
-      <div className="bg-cream rounded-2xl p-5 space-y-2 text-sm">
-        <p className="font-semibold text-charcoal text-xs uppercase tracking-wide mb-3">Your search</p>
-        <div className="grid grid-cols-2 gap-y-1.5 text-charcoal-muted">
-          <span>Type</span>
-          <span className="text-charcoal font-medium capitalize">{rentalType}</span>
-          <span>Budget</span>
-          <span className="text-charcoal font-medium">{budget ? `${budget} ${currency}/mo` : '—'}</span>
-          <span>Area</span>
-          <span className="text-charcoal font-medium">{suggestArea ? 'AI suggestions' : area || '—'}</span>
-          <span>Bedrooms</span>
-          <span className="text-charcoal font-medium">{bedrooms === 'studio' ? 'Studio' : `${bedrooms} bed`}</span>
-        </div>
       </div>
 
-      {/* Search note */}
+      {/* AI search note */}
       <div className="flex items-start gap-3 p-4 bg-sage-light rounded-xl text-sm text-sage-dark">
         <span className="text-xl">✨</span>
         <p>{t('searchNote')}</p>
       </div>
     </div>,
   ];
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="bg-white rounded-3xl shadow-xl shadow-charcoal/5 border border-cream-deep p-8 sm:p-10">
@@ -316,7 +330,7 @@ export default function IntakeForm() {
       </div>
 
       {/* Step content */}
-      <div className="min-h-[280px]">{stepContent[step - 1]}</div>
+      <div className="min-h-[300px]">{stepContent[step - 1]}</div>
 
       {/* Navigation */}
       <div className="flex items-center justify-between mt-10 pt-6 border-t border-cream-deep">
@@ -327,7 +341,7 @@ export default function IntakeForm() {
           className="btn-ghost gap-2 disabled:opacity-0 disabled:pointer-events-none"
         >
           <ArrowLeft className="w-4 h-4" />
-          {t('back')}
+          Back
         </button>
 
         {step < TOTAL_STEPS ? (
@@ -336,13 +350,13 @@ export default function IntakeForm() {
             onClick={() => setStep((s) => s + 1)}
             className="btn-primary gap-2"
           >
-            {t('next')}
+            Next
             <ArrowRight className="w-4 h-4" />
           </button>
         ) : (
-          <Button loading={loading} onClick={handleSubmit} className="gap-2">
-            {loading ? t('searching') : t('search')}
-            {!loading && <ArrowRight className="w-4 h-4" />}
+          <Button loading={loading} onClick={handleSubmit} size="lg" className="gap-2 px-8">
+            <Home className="w-4 h-4" />
+            Find My Home
           </Button>
         )}
       </div>
